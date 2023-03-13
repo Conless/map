@@ -337,7 +337,23 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         tnode *cur = rt;
         while (true) {
             erase_adjust(cur);
-            if (cur->key )
+            int comp = Compare()(cur->key, key) - Compare()(key, cur->key);
+            if (!comp && cur->left != nullptr && cur->right != nullptr) {
+                tnode *next = cur->right;
+                while (next->left)
+                    next = next->left;
+                key = cur->key = next->key;
+                cur->data = next->data;
+                cur = cur->right;
+                continue;
+            }
+            if (!comp) {
+                if (is_left(cur))
+                    cur->parent->left = nullptr;
+                else
+                    cur->parent->right = nullptr;
+                
+            }
         }
     }
     /**
@@ -576,13 +592,13 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
     }
 
     /**
-     * @brief Get the uncle of the selected node
+     * @brief Get the aunt of the selected node
      * @throw custom_exception by is_left() when passing the root node
      *
      * @param cur
      * @return tnode*
      */
-    tnode *uncle(tnode *cur) {
+    tnode *aunt(tnode *cur) {
         if (cur->parent == nullptr)
             throw custom_exception("Unexpected operations on the root node.");
         return sibling(cur->parent);
