@@ -11,7 +11,7 @@ class map_enabled_testing : public map<int, int> {
         if (cur == nullptr)
             return;
         inorder_traverse(cur->left);
-        printf("(%d, %c, %d, %d) ", cur->key, cur->col == RED ? 'R' : 'B', cur->left ? cur->left->key : 0, cur->right ? cur->right->key : 0);
+        printf("(%d, %c, %d, %d) ", cur->data.first, cur->col == RED ? 'R' : 'B', cur->left ? cur->left->data.first : 0, cur->right ? cur->right->data.first : 0);
         inorder_traverse(cur->right);
     }
     void inorder_output() {

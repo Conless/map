@@ -29,19 +29,13 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      */
     enum color { BLACK, RED };
     struct tnode {
-        Key key;
-        T data;
+        value_type data;
         tnode *left, *right, *parent;
-        color col = RED;
+        color col;
         int siz;
 
-        tnode() : key(), data(), siz(0) { left = right = parent = nullptr; }
-        tnode(const value_type &_value, tnode *_parent, int _siz = 0) : tnode(_value.first, _value.second, _parent, _siz) {}
-        tnode(const Key &_key, const T &_data, tnode *_parent, int _siz = 0)
-            : key(_key), data(_data), siz(_siz), parent(_parent) {
-            left = right = nullptr;
-        }
-
+        tnode(const value_type &_data, tnode *_parent, color _col, int _siz = 0)
+            : data(_data), parent(_parent), col(_col), siz(_siz) {}
     } * rt;
 
     friend class map_enabled_testing;
@@ -92,7 +86,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         /**
          * TODO iter++
          */
-        iterator operator++(int) {}
+        iterator operator++(int) { return *this; }
         /**
          * TODO ++iter
          */
@@ -109,22 +103,23 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
          * a operator to check whether two iterators are same (pointing to the same memory).
          */
         value_type &operator*() const {}
-        bool operator==(const iterator &rhs) const {}
-        bool operator==(const const_iterator &rhs) const {}
+        bool operator==(const iterator &rhs) const { return ptr == rhs.ptr; }
+        bool operator==(const const_iterator &rhs) const { return ptr != rhs.ptr; }
         /**
          * some other operator for iterator.
          */
-        bool operator!=(const iterator &rhs) const {}
-        bool operator!=(const const_iterator &rhs) const {}
+        bool operator!=(const iterator &rhs) const { return ptr != rhs.ptr; }
+        bool operator!=(const const_iterator &rhs) const { return ptr != rhs.ptr; }
 
         /**
          * for the support of it->first.
          * See <http://kelvinh.github.io/blog/2013/11/20/overloading-of-member-access-operator-dash-greater-than-symbol-in-cpp/>
          * for help.
          */
-        value_type *operator->() const noexcept {}
+        value_type *operator->() const noexcept { return &ptr->data; }
     };
     class const_iterator {
+        friend class iterator;
         // it should has similar member method as iterator.
         //  and it should be able to construct from an iterator.
       private:
@@ -143,10 +138,20 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             // TODO
         }
         const_iterator(const map<Key, T, Compare> *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
+
+        const_iterator operator++(int) {}
+        const_iterator &operator++() {}
+        const_iterator operator--(int) {}
+        const_iterator &operator--() {}
+
+        const value_type &operator*() const {}
+
         // And other methods in iterator.
         bool operator==(const const_iterator &rhs) { return ptr == rhs.ptr; }
         // And other methods in iterator.
+        bool operator!=(const const_iterator &rhs) { return ptr != rhs.ptr; }
         // And other methods in iterator.
+        const value_type *operator->() const noexcept { return &ptr->data; }
     };
     /**
      * TODO two constructors
@@ -181,7 +186,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
              * if key > cur->key, comp = 1 - 0 = 1
              * (same below)
              */
-            int comp = Compare()(cur->key, key) - Compare()(key, cur->key);
+            int comp = Compare()(cur->data.first, key) - Compare()(key, cur->data.first);
             if (!comp)
                 break;
             if (comp < 0)
@@ -191,12 +196,12 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         }
         if (cur == nullptr)
             throw index_out_of_bound();
-        return cur->data;
+        return cur->data.second;
     }
     const T &at(const Key &key) const {
         tnode *cur = rt;
         while (cur != nullptr) {
-            int comp = Compare()(cur->key, key) - Compare()(key, cur->key);
+            int comp = Compare()(cur->data.first, key) - Compare()(key, cur->data.first);
             if (!comp)
                 break;
             if (comp < 0)
@@ -206,7 +211,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         }
         if (cur == nullptr)
             throw index_out_of_bound();
-        return cur->data;
+        return cur->data.second;
     }
     /**
      * TODO
@@ -217,7 +222,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
     T &operator[](const Key &key) {
         try {
             return at(key);
-        } catch (index_out_of_bound()) {
+        } catch (...) {
             value_type new_value(key, T());
             auto insert_iter = insert(new_value).first;
             return insert_iter->second;
@@ -250,22 +255,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      * return a iterator to the end
      * in fact, it returns past-the-end.
      */
-    iterator end() {
-        tnode *u = rt;
-        if (u == nullptr)
-            return iterator(this, nullptr);
-        while (u->left != nullptr)
-            u = u->left;
-        return iterator(this, u);
-    }
-    const_iterator cend() const {
-        tnode *u = rt;
-        if (u == nullptr)
-            return iterator(this, nullptr);
-        while (u->right != nullptr)
-            u = u->left;
-        return iterator(this, u);
-    }
+    iterator end() { return iterator{this, nullptr}; }
+    const_iterator cend() const { return iterator(this, nullptr); }
     /**
      * checks whether the container is empty
      * return true if empty, otherwise false.
@@ -274,7 +265,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
     /**
      * returns the number of elements.
      */
-    size_t size() const { return rt->siz; }
+    size_t size() const { return rt == nullptr ? 0 : rt->siz; }
     /**
      * clears the contents
      */
@@ -289,34 +280,40 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         tnode *cur = rt, *next;
         if (cur == nullptr) { // If the tree is empty
             // Create a new root node, with col = RED, size = 1 and no links to other node
-            rt = cur = new tnode(value, nullptr);
+            rt = cur = new tnode(value, nullptr, BLACK);
             return {iterator(this, cur), true};
         }
+        // Here we try to ensure the node we found cannot have a red sibling,
+        // which requires that every node on the path doesn't have two red descendants.
         while (true) {
-            int comp = Compare()(cur->key, value.first) - Compare()(value.first, cur->key);
+            int comp = Compare()(cur->data.first, value.first) - Compare()(value.first, cur->data.first);
             if (!comp) // Find the same element
                 return {iterator(this, cur), false};
+            // If the current node has two red descendeants, we should change them to black.
             if ((cur->left && cur->left->col == RED) && (cur->right && cur->right->col == RED)) {
                 cur->col = RED;
                 cur->left->col = cur->right->col = BLACK;
+                // fix the situation if there's a red-red link to its parent.
                 insert_adjust(cur);
             }
             if (comp < 0) {
                 if (cur->left == nullptr) {
-                    cur = cur->left = new tnode(value, cur);
+                    cur = cur->left = new tnode(value, cur, RED);
                     break;
                 }
                 cur = cur->left;
             } else {
                 if (cur->right == nullptr) {
-                    cur = cur->right = new tnode(value, cur);
+                    cur = cur->right = new tnode(value, cur, RED);
                     break;
                 }
                 cur = cur->right;
             }
         }
+        // After inserted, fix the red-red link again
         insert_adjust(cur);
-        size_adjust(cur, 1);
+        // Change the size backward
+        size_adjust_upward(cur, 1);
         return {iterator(this, cur), true};
     }
     /**
@@ -328,32 +325,44 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         iterator target = find(pos->first);
         if (target == end() || target != pos)
             return;
-        Key key = pos->first;
-        if (rt->key == key && rt->left == nullptr && rt->right == nullptr) {
+        Key *key = new Key(pos->first);
+        if (!Compare()(rt->data.first, *key) && !Compare()(rt->data.first, *key) && rt->left == nullptr &&
+            rt->right == nullptr) {
             delete rt;
             rt = nullptr;
             return;
         }
         tnode *cur = rt;
+        // Here we try to ensure every node we met is red, which then conducts the node we want to delete is red
         while (true) {
-            erase_adjust(cur);
-            int comp = Compare()(cur->key, key) - Compare()(key, cur->key);
+            // Change the current node to red
+            erase_adjust(cur, *key);
+            int comp = Compare()(cur->data.first, *key) - Compare()(*key, cur->data.first);
+            // If we find the node with two descendents,
+            // swap the data with its 'next' node and delete that node then
             if (!comp && cur->left != nullptr && cur->right != nullptr) {
                 tnode *next = cur->right;
                 while (next->left)
                     next = next->left;
-                key = cur->key = next->key;
-                cur->data = next->data;
+                move(cur, next);
+                delete key;
+                key = new Key(next->data.first);
                 cur = cur->right;
                 continue;
             }
+            // If we find the node
             if (!comp) {
+                tnode *replacement = cur->left == nullptr ? cur->right : cur->left;
                 if (is_left(cur))
-                    cur->parent->left = nullptr;
+                    cur->parent->left = replacement;
                 else
-                    cur->parent->right = nullptr;
-                
+                    cur->parent->right = replacement;
+                size_adjust_upward(cur, -1);
+                delete cur;
+                return;
             }
+            // Go to the next node
+            cur = comp > 0 ? cur->right : cur->left;
         }
     }
     /**
@@ -363,7 +372,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      *     since this container does not allow duplicates.
      * The default method of check the equivalence is !(a < b || b > a)
      */
-    size_t count(const Key &key) const { return find(key) == cend(); }
+    size_t count(const Key &key) const { return find(key) != cend(); }
     /**
      * Finds an element with key equivalent to key.
      * key value of the element to search for.
@@ -374,8 +383,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         tnode *cur = rt;
         if (cur == nullptr)
             return end();
-        while (cur && cur->key != key) {
-            int comp = Compare()(cur->key, key) - Compare()(key, cur->key);
+        while (cur) {
+            int comp = Compare()(cur->data.first, key) - Compare()(key, cur->data.first);
             if (!comp)
                 return iterator(this, cur);
             if (comp < 0)
@@ -389,8 +398,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         tnode *cur = rt;
         if (cur == nullptr)
             return cend();
-        while (cur && cur->key != key) {
-            int comp = Compare()(cur->key, key) - Compare()(key, cur->key);
+        while (cur) {
+            int comp = Compare()(cur->data.first, key) - Compare()(key, cur->data.first);
             if (!comp)
                 return iterator(this, cur);
             if (comp < 0)
@@ -416,13 +425,20 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
     };
 
   protected:
+    void size_adjust(tnode *cur) {
+        cur->siz = 0;
+        if (cur->left != nullptr)
+            cur->siz += cur->left->siz;
+        if (cur->right != nullptr)
+            cur->siz += cur->right->siz;
+    }
     /**
      * @brief Adjust the size of the nodes upward
      *
      * @param cur
      * @param delta
      */
-    void size_adjust(tnode *cur, int delta) {
+    void size_adjust_upward(tnode *cur, int delta) {
         while (cur != nullptr) {
             cur->siz += delta;
             cur = cur->parent;
@@ -442,31 +458,85 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             return;
         }
         if (is_left(cur->parent)) {
-            if (!is_left(cur))
-                left_rotate(cur);
-            right_rotate(cur);
+            if (is_left(cur)) {
+                /** Change the tree by
+                 *      B                         B
+                 *     / \                       / \
+                 *    R   B     ------->  (cur) R   R
+                 *   /                               \
+                 *  R (cur)                           B
+                 */
+                right_rotate(cur->parent->parent);
+                std::swap(cur->parent->col, sibling(cur)->col);
+            } else {
+                /** Change the tree by
+                 *      B                     B             B (cur)
+                 *     / \                   / \           / \
+                 *    R   B     ----->(cur) R   R ----->  R   R
+                 *     \                   /                   \
+                 *      R (cur)           R                     B
+                 */
+                left_rotate(cur->parent);
+                right_rotate(cur->parent);
+                std::swap(cur->col, cur->right->col);
+            }
         } else {
-            if (is_left(cur))
-                right_rotate(cur);
-            left_rotate(cur);
+            if (is_left(cur)) {
+                /** Change the tree by
+                 *      B                B                  B (cur)
+                 *     / \              / \                / \
+                 *    B   R     -----> B   R (cur) -----> R   R
+                 *       /                  \            /
+                 *      R (cur)              R          B
+                 */
+                right_rotate(cur->parent);
+                left_rotate(cur->parent);
+                std::swap(cur->col, cur->left->col);
+            } else {
+                /** Change the tree by
+                 *      B                   B
+                 *     / \                 / \
+                 *    B   R     ------->  R   R (cur)
+                 *         \             /
+                 *          R (cur)     B
+                 */
+                left_rotate(cur->parent->parent);
+                std::swap(cur->parent->col, sibling(cur)->col);
+            }
         }
-        std::swap(cur->parent->col, sibling(cur)->col);
     }
 
     /**
      * @brief Adjust every node on the path to red node
-     * 
-     * @param cur 
+     *
+     * @param cur
      */
-    void erase_adjust(tnode *cur) {
+    void erase_adjust(tnode *cur, Key del) {
+        // If the current node is red, we don't need to change it.
+        // Notice: it only happens when current node is root.
+        if (cur->col == RED)
+            return;
+        // If the current node is root
+        if (cur == rt) {
+            if (cur->left && cur->right && cur->left->col == cur->right->col) {
+                cur->col = RED;
+                cur->left->col = cur->right->col = BLACK;
+                return;
+            } else {
 
+            }
+        }
+        // Notice: if the current node is a black node but not root, it must have a sibling
+        if (has_black_descendants(cur)) {
+            // tnode *sib = 
+        }
     }
 
     /**
      * @brief Rotate the selected node to its left child, with its right child replacing the current position
-     *   rt              r0
-     *  /  \            /  \
-     * l0   r0  ---->  rt  r1
+     *   cur              r0
+     *  /  \             /  \
+     * l0   r0  ---->  cur  r1
      *     /  \       /  \
      *    l1  r1     l0  l1
      * @throw custom_exception when the selected node doesn't have a right child
@@ -491,13 +561,15 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             tmp->left->parent = cur;
         tmp->left = cur;
         cur->parent = tmp;
+        size_adjust(cur);
+        size_adjust(tmp);
     }
 
     /**
      * @brief Rotate the selected node to its right child, with its left child replacing the current position
-     *      rt             l0
+     *      cur            l0
      *     /  \           /  \
-     *    l0  r0  ---->  l1  rt
+     *    l0  r0  ---->  l1  cur
      *   /  \               /  \
      *  l1  r1             r1  r0
      * @throw custom_exception when the selected node doesn't have a left child
@@ -506,7 +578,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      */
     void right_rotate(tnode *cur) {
         if (cur->left == nullptr)
-            throw custom_exception("The node to rotate (left) doesn't have a right child.");
+            throw custom_exception("The node to rotate (right) doesn't have a left child.");
         if (cur->parent) {
             if (is_left(cur))
                 cur->parent->left = cur->left;
@@ -522,6 +594,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             tmp->right->parent = cur;
         tmp->right = cur;
         cur->parent = tmp;
+        size_adjust(cur);
+        size_adjust(tmp);
     }
 
   private:
@@ -535,10 +609,39 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
     tnode *copy(tnode *target, tnode *_parent = nullptr) {
         if (target == nullptr)
             return nullptr;
-        tnode *tmp = new tnode(target->key, target->data, _parent, target->siz);
+        tnode *tmp = new tnode(target->data, _parent, target->col, target->siz);
         tmp->left = copy(target->left, tmp);
         tmp->right = copy(target->right, tmp);
         return tmp;
+    }
+
+    /**
+     * @brief move the data from another tree node, since the Key type doesn't even support the f**king assignment operation
+     *
+     * @param cur
+     * @param target
+     */
+    void move(tnode *&cur, tnode *target) {
+        tnode *_left = cur->left, *_right = cur->right, *_parent = cur->parent;
+        color _col = cur->col;
+        bool _is_left = cur == rt ? 0 : is_left(cur);
+        int _siz = cur->siz;
+        delete cur;
+        cur = new tnode(target->data, _parent, _col, _siz);
+        if (_parent) {
+            if (_is_left)
+                _parent->left = cur;
+            else
+                _parent->right = cur;
+        }
+        if (_left) {
+            cur->left = _left;
+            _left->parent = cur;
+        }
+        if (_right) {
+            cur->right = _right;
+            _right->parent = cur;
+        }
     }
 
     /**
@@ -567,6 +670,11 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         if (cur->parent == nullptr)
             throw custom_exception("Unexpected operations on the root node.");
         return cur->parent->left == cur;
+    }
+
+    bool has_black_descendants(tnode *cur) {
+        return ((cur->left && cur->left->col == BLACK) || cur->left == nullptr) &&
+               ((cur->right && cur->right->col == BLACK) || cur->right == nullptr);
     }
 
     /**
