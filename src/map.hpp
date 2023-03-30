@@ -35,8 +35,10 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         int siz;
 
         tnode(const value_type &_data, tnode *_parent, color _col, int _siz = 0)
-            : data(_data), parent(_parent), col(_col), siz(_siz) {}
+            : data(_data), left(nullptr), right(nullptr), parent(_parent), col(_col), siz(_siz) {}
     } * rt;
+
+    int siz = 0;
 
     friend class map_enabled_testing;
 
@@ -50,6 +52,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      */
     class const_iterator;
     class iterator {
+        friend class const_iterator;
+
       private:
         /**
          * TODO add data members
@@ -86,23 +90,81 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         /**
          * TODO iter++
          */
-        iterator operator++(int) { return *this; }
+        iterator operator++(int) {
+            iterator cp = *this;
+            if (ptr->right) {
+                ptr = ptr->right;
+                while (ptr->left != nullptr)
+                    ptr = ptr->left;
+            } else {
+                while (ptr != iter->rt && !iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return cp;
+        }
         /**
          * TODO ++iter
          */
-        iterator &operator++() {}
+        iterator &operator++() {
+            if (ptr->right) {
+                ptr = ptr->right;
+                while (ptr->left != nullptr)
+                    ptr = ptr->left;
+            } else {
+                while (ptr != iter->rt && !iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return *this;
+        }
         /**
          * TODO iter--
          */
-        iterator operator--(int) {}
+        iterator operator--(int) {
+            iterator cp = *this;
+            if (ptr == nullptr) {
+                ptr = iter->rt;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+                return cp;
+            }
+            if (ptr->left) {
+                ptr = ptr->left;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+            } else {
+                while (ptr != iter->rt && iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return cp;
+        }
         /**
          * TODO --iter
          */
-        iterator &operator--() {}
+        iterator &operator--() {
+            if (ptr == nullptr) {
+                ptr = iter->rt;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+                return *this;
+            }
+            if (ptr->left) {
+                ptr = ptr->left;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+            } else {
+                while (ptr != iter->rt && iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return *this;
+        }
         /**
          * a operator to check whether two iterators are same (pointing to the same memory).
          */
-        value_type &operator*() const {}
+        value_type &operator*() const { return ptr->data; }
         bool operator==(const iterator &rhs) const { return ptr == rhs.ptr; }
         bool operator==(const const_iterator &rhs) const { return ptr != rhs.ptr; }
         /**
@@ -128,23 +190,75 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         tnode *ptr;
 
       public:
-        const_iterator() {
-            // TODO
-        }
-        const_iterator(const const_iterator &other) {
-            // TODO
-        }
-        const_iterator(const iterator &other) {
-            // TODO
-        }
+        const_iterator() : iter(nullptr), ptr(nullptr) {}
+        const_iterator(const const_iterator &other) : iter(other.iter), ptr(other.ptr) {}
+        const_iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
         const_iterator(const map<Key, T, Compare> *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
 
-        const_iterator operator++(int) {}
-        const_iterator &operator++() {}
-        const_iterator operator--(int) {}
-        const_iterator &operator--() {}
+        const_iterator operator++(int) {
+            const_iterator cp = *this;
+            if (ptr->right) {
+                ptr = ptr->right;
+                while (ptr->left != nullptr)
+                    ptr = ptr->left;
+            } else {
+                while (ptr != iter->rt && !iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return cp;
+        }
+        const_iterator &operator++() {
+            if (ptr->right) {
+                ptr = ptr->right;
+                while (ptr->left != nullptr)
+                    ptr = ptr->left;
+            } else {
+                while (ptr != iter->rt && !iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return *this;
+        }
+        const_iterator operator--(int) {
+            const_iterator cp = *this;
+            if (ptr == nullptr) {
+                ptr = iter->rt;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+                return cp;
+            }
+            if (ptr->left) {
+                ptr = ptr->left;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+            } else {
+                while (ptr != iter->rt && iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return cp;
+        }
+        const_iterator &operator--() {
+            if (ptr == nullptr) {
+                ptr = iter->rt;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+                return *this;
+            }
+            if (ptr->left) {
+                ptr = ptr->left;
+                while (ptr->right != nullptr)
+                    ptr = ptr->right;
+            } else {
+                while (ptr != iter->rt && iter->is_left(ptr))
+                    ptr = ptr->parent;
+                ptr = ptr->parent;
+            }
+            return *this;
+        }
 
-        const value_type &operator*() const {}
+        const value_type &operator*() const { return ptr->data; }
 
         // And other methods in iterator.
         bool operator==(const const_iterator &rhs) { return ptr == rhs.ptr; }
@@ -157,20 +271,21 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      * TODO two constructors
      */
     map() : rt(nullptr) {}
-    map(const map &other) { rt = copy(other.rt); }
+    map(const map &other) { rt = node_copy(other.rt); siz = other.siz; }
     /**
      * TODO assignment operator
      */
     map &operator=(const map &other) {
         if (this == &other)
             return *this;
-        rt = copy(other.rt);
+        rt = node_copy(other.rt);
+        siz = other.siz;
         return *this;
     }
     /**
      * TODO Destructors
      */
-    ~map() { destruct(rt); }
+    ~map() { node_destruct(rt); }
     /**
      * TODO
      * access specified element with bounds checking
@@ -247,7 +362,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         tnode *u = rt;
         if (u == nullptr)
             return iterator(this, nullptr);
-        while (u->right != nullptr)
+        while (u->left != nullptr)
             u = u->left;
         return iterator(this, u);
     }
@@ -265,11 +380,11 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
     /**
      * returns the number of elements.
      */
-    size_t size() const { return rt == nullptr ? 0 : rt->siz; }
+    size_t size() const { return siz; }
     /**
      * clears the contents
      */
-    void clear() { destruct(rt); }
+    void clear() { node_destruct(rt); siz = 0; }
     /**
      * insert an element.
      * return a pair, the first of the pair is
@@ -281,6 +396,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         if (cur == nullptr) { // If the tree is empty
             // Create a new root node, with col = RED, size = 1 and no links to other node
             rt = cur = new tnode(value, nullptr, BLACK);
+            siz++;
             return {iterator(this, cur), true};
         }
         // Here we try to ensure the node we found cannot have a red sibling,
@@ -314,6 +430,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         insert_adjust(cur);
         // Change the size backward
         size_adjust_upward(cur, 1);
+        siz++;
         return {iterator(this, cur), true};
     }
     /**
@@ -325,11 +442,11 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         iterator target = find(pos->first);
         if (target == end() || target != pos)
             return;
-        Key *key = new Key(pos->first);
-        if (!Compare()(rt->data.first, *key) && !Compare()(rt->data.first, *key) && rt->left == nullptr &&
+        if (!Compare()(rt->data.first, pos->first) && !Compare()(rt->data.first, pos->first) && rt->left == nullptr &&
             rt->right == nullptr) {
             delete rt;
             rt = nullptr;
+            siz--;
             return;
         }
         tnode *cur = rt;
@@ -338,18 +455,16 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             if (cur == nullptr)
                 return;
             // Change the current node to red
-            erase_adjust(cur, *key);
-            int comp = Compare()(cur->data.first, *key) - Compare()(*key, cur->data.first);
+            erase_adjust(cur, pos->first);
+            int comp = Compare()(cur->data.first, pos->first) - Compare()(pos->first, cur->data.first);
             // If we find the node with two descendents,
             // swap the data with its 'next' node and delete that node then
             if (!comp && cur->left != nullptr && cur->right != nullptr) {
                 tnode *next = cur->right;
                 while (next->left)
                     next = next->left;
-                move(cur, next);
-                delete key;
-                key = new Key(next->data.first);
-                cur = cur->right;
+                node_swap(cur, next);
+                cur = next->right;
                 continue;
             }
             // If we find the node
@@ -361,6 +476,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
                     cur->parent->right = replacement;
                 size_adjust_upward(cur, -1);
                 delete cur;
+                siz--;
                 return;
             }
             // Go to the next node
@@ -374,7 +490,14 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      *     since this container does not allow duplicates.
      * The default method of check the equivalence is !(a < b || b > a)
      */
-    size_t count(const Key &key) const { return find(key) == cend() ? 0 : 1; }
+    size_t count(const Key &key) const {
+        const_iterator fd = find(key);
+        if (fd == cend())
+            return 0;
+        else
+            return 1;
+        // return find(key) == cend() ? 0 : 1;
+    }
     /**
      * Finds an element with key equivalent to key.
      * key value of the element to search for.
@@ -403,13 +526,13 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         while (cur) {
             int comp = Compare()(cur->data.first, key) - Compare()(key, cur->data.first);
             if (!comp)
-                return iterator(this, cur);
+                return const_iterator(this, cur);
             if (comp < 0)
                 cur = cur->left;
             else
                 cur = cur->right;
         }
-        return cur == nullptr ? cend() : iterator(this, cur);
+        return cur == nullptr ? cend() : const_iterator(this, cur);
     }
 
   protected:
@@ -749,42 +872,57 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      * @param _parent
      * @return return the copy of selected tree node
      */
-    tnode *copy(tnode *target, tnode *_parent = nullptr) {
+    tnode *node_copy(tnode *target, tnode *_parent = nullptr) {
         if (target == nullptr)
             return nullptr;
         tnode *tmp = new tnode(target->data, _parent, target->col, target->siz);
-        tmp->left = copy(target->left, tmp);
-        tmp->right = copy(target->right, tmp);
+        tmp->left = node_copy(target->left, tmp);
+        tmp->right = node_copy(target->right, tmp);
         return tmp;
     }
 
     /**
-     * @brief move the data from another tree node, since the Key type doesn't even support the f**king assignment operation
+     * @brief swap the node with another tree node, since the Key type doesn't even support the f**king assignment operation
      *
      * @param cur
      * @param target
      */
-    void move(tnode *&cur, tnode *target) {
-        tnode *_left = cur->left, *_right = cur->right, *_parent = cur->parent;
-        color _col = cur->col;
-        bool _is_left = cur == rt ? 0 : is_left(cur);
-        int _siz = cur->siz;
-        delete cur;
-        cur = new tnode(target->data, _parent, _col, _siz);
-        if (_parent) {
-            if (_is_left)
-                _parent->left = cur;
+    void node_swap(tnode *cur, tnode *target) {
+        // parent
+        int cur_is_left = target->parent ? is_left(target) : 0;
+        int tar_is_left = cur->parent ? is_left(cur) : 0;
+        std::swap(cur->parent, target->parent);
+        if (cur->parent) {
+            if (cur_is_left)
+                cur->parent->left = cur;
             else
-                _parent->right = cur;
+                cur->parent->right = cur;
+        } else {
+            rt = cur;
         }
-        if (_left) {
-            cur->left = _left;
-            _left->parent = cur;
+        if (target->parent) {
+            if (tar_is_left)
+                target->parent->left = target;
+            else
+                target->parent->right = target;
+        } else {
+            rt = target;
         }
-        if (_right) {
-            cur->right = _right;
-            _right->parent = cur;
-        }
+        // left
+        std::swap(cur->left, target->left);
+        if (cur->left)
+            cur->left->parent = cur;
+        if (target->left)
+            target->left->parent = target;
+        // right
+        std::swap(cur->right, target->right);
+        if (cur->right)
+            cur->right->parent = cur;
+        if (target->right)
+            target->right->parent = target;
+        // color and size
+        std::swap(cur->col, target->col);
+        std::swap(cur->siz, target->siz);
     }
 
     /**
@@ -792,11 +930,11 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      *
      * @param target
      */
-    void destruct(tnode *&target) {
+    void node_destruct(tnode *&target) {
         if (target == nullptr)
             return;
-        destruct(target->left);
-        destruct(target->right);
+        node_destruct(target->left);
+        node_destruct(target->right);
         delete target;
         target = nullptr;
     }
@@ -809,7 +947,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      * @return true when is the left child
      * @return false when is the right child
      */
-    bool is_left(tnode *cur) {
+    bool is_left(tnode *cur) const {
         if (cur->parent == nullptr)
             throw custom_exception("Unexpected operations on the root node.");
         return cur->parent->left == cur;
