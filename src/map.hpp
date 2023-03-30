@@ -360,6 +360,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      *   performing an insertion if such key does not already exist.
      */
     T &operator[](const Key &key) {
+        return insert({key, T()}).first->second;
         try {
             return at(key);
         } catch (...) {
@@ -454,7 +455,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         // After inserted, fix the red-red link again
         insert_adjust(cur);
         // Change the size backward
-        size_adjust_upward(cur, 1);
+        // size_adjust_upward(cur, 1);
         siz++;
         return {iterator(this, cur), true};
     }
@@ -498,7 +499,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
                     cur->parent->left = replacement;
                 else
                     cur->parent->right = replacement;
-                size_adjust_upward(cur, -1);
+                // size_adjust_upward(cur, -1);
                 delete cur;
                 siz--;
                 return;
@@ -851,8 +852,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             tmp->left->parent = cur;
         tmp->left = cur;
         cur->parent = tmp;
-        size_adjust(cur);
-        size_adjust(tmp);
+        // size_adjust(cur);
+        // size_adjust(tmp);
     }
 
     /**
@@ -884,8 +885,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             tmp->right->parent = cur;
         tmp->right = cur;
         cur->parent = tmp;
-        size_adjust(cur);
-        size_adjust(tmp);
+        // size_adjust(cur);
+        // size_adjust(tmp);
     }
 
   private:
