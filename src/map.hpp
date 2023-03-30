@@ -994,32 +994,6 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             return nullptr;
         return is_left(cur) ? cur->parent->right : cur->parent->left;
     }
-
-    /**
-     * @brief Get the grand parent of the selected node
-     * @throw custom_exception when passing the root node
-     *
-     * @param cur
-     * @return tnode*
-     */
-    tnode *grand_parent(tnode *cur) {
-        if (cur->parent == nullptr)
-            throw custom_exception("Unexpected operations on the root node.");
-        return cur->parent->parent;
-    }
-
-    /**
-     * @brief Get the aunt of the selected node
-     * @throw custom_exception by is_left() when passing the root node
-     *
-     * @param cur
-     * @return tnode*
-     */
-    tnode *aunt(tnode *cur) {
-        if (cur->parent == nullptr)
-            throw custom_exception("Unexpected operations on the root node.");
-        return sibling(cur->parent);
-    }
 };
 
 template class map<std::string, int>;

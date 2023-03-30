@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 project(map)
 
-set(CMAKE_CXX_FLAGS "-g -O2 -std=c++17")
+set(CMAKE_CXX_FLAGS "-g -std=c++17")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 
@@ -17,7 +17,7 @@ add_subdirectory(src)
 # Testing
 enable_testing()
 set(files_prefix "${CMAKE_CURRENT_SOURCE_DIR}/data")
-file(GLOB_RECURSE CPPs "${files_prefix}/one/**.cpp")
+file(GLOB_RECURSE CPPs "${files_prefix}/one/**.cpp" "${files_prefix}/two/**.cpp" "${files_prefix}/three/**.cpp" "${files_prefix}/four/**.cpp" "${files_prefix}/five/**.cpp")
 
 string(REGEX REPLACE "^/([a-zA-Z]*/)*" "" cata "${CMAKE_CURRENT_SOURCE_DIR}")
 

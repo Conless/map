@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include <algorithm>
-#include "map.h"
+#include "map.hpp"
 using namespace std;
 
 template<class T>
