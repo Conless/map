@@ -20,10 +20,22 @@ class map_enabled_testing : public map<int, int> {
     }
 } m;
 
+// map<int, int> m;
+
 int main() {
-    int key, data = 0;
-    while (std::cin >> key) {
-        m.insert({key, data});
+    int opt, key, data = 0;
+    // int n = 100000;
+    // for (int i = 1; i <= n; i++)
+    //     m.insert({i, 0});
+    // for (int i = 1; i <= n; i++)
+    //     m.erase(m.find(i));
+    // return 0;
+    while (std::cin >> opt >> key) {
+        if (opt == 1)
+            m.insert({key, data});
+        else
+            m.erase(m.find(key));
         m.inorder_output();
     }
+    return 0;
 }

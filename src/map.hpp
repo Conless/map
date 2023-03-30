@@ -256,7 +256,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      * in fact, it returns past-the-end.
      */
     iterator end() { return iterator{this, nullptr}; }
-    const_iterator cend() const { return iterator(this, nullptr); }
+    const_iterator cend() const { return const_iterator(this, nullptr); }
     /**
      * checks whether the container is empty
      * return true if empty, otherwise false.
@@ -335,6 +335,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         tnode *cur = rt;
         // Here we try to ensure every node we met is red, which then conducts the node we want to delete is red
         while (true) {
+            if (cur == nullptr)
+                return;
             // Change the current node to red
             erase_adjust(cur, *key);
             int comp = Compare()(cur->data.first, *key) - Compare()(*key, cur->data.first);
@@ -372,7 +374,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      *     since this container does not allow duplicates.
      * The default method of check the equivalence is !(a < b || b > a)
      */
-    size_t count(const Key &key) const { return find(key) != cend(); }
+    size_t count(const Key &key) const { return find(key) == cend() ? 0 : 1; }
     /**
      * Finds an element with key equivalent to key.
      * key value of the element to search for.
@@ -460,21 +462,21 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         if (is_left(cur->parent)) {
             if (is_left(cur)) {
                 /** Change the tree by
-                 *      B                         B
-                 *     / \                       / \
-                 *    R   B     ------->  (cur) R   R
-                 *   /                               \
-                 *  R (cur)                           B
+                 *      B1                       B2
+                 *     / \                      / \
+                 *    R2  B3     ------->  (cur)R  R1
+                 *   /                              \
+                 *  R(cur)                           B3
                  */
                 right_rotate(cur->parent->parent);
                 std::swap(cur->parent->col, sibling(cur)->col);
             } else {
                 /** Change the tree by
-                 *      B                     B             B (cur)
-                 *     / \                   / \           / \
-                 *    R   B     ----->(cur) R   R ----->  R   R
-                 *     \                   /                   \
-                 *      R (cur)           R                     B
+                 *      B1                     B1            R(cur)         B(cur)
+                 *     / \                    / \           / \            /  \
+                 *    R2  B3     -----> (cur)R   B3 -----> R2  B1  -----> R2  R1
+                 *     \                   /                    \               \
+                 *      R(cur)            R2                     B3             B3
                  */
                 left_rotate(cur->parent);
                 right_rotate(cur->parent);
@@ -483,22 +485,22 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         } else {
             if (is_left(cur)) {
                 /** Change the tree by
-                 *      B                B                  B (cur)
-                 *     / \              / \                / \
-                 *    B   R     -----> B   R (cur) -----> R   R
-                 *       /                  \            /
-                 *      R (cur)              R          B
+                 *      B1               B1                 R(cur)          B(cur)
+                 *     / \              / \                / \             / \
+                 *    B2  R3    -----> B2  R(cur) ----->  B1  R3   -----> R1  R3
+                 *       /                  \            /               /
+                 *      R(cur)               R3         B2              B2
                  */
                 right_rotate(cur->parent);
                 left_rotate(cur->parent);
                 std::swap(cur->col, cur->left->col);
             } else {
                 /** Change the tree by
-                 *      B                   B
-                 *     / \                 / \
-                 *    B   R     ------->  R   R (cur)
-                 *         \             /
-                 *          R (cur)     B
+                 *       B1                R3                B3
+                 *      / \               / \               /  \
+                 *     B2  R3  ------->  B1  R(cur) -----> R1  R(cur)
+                 *          \           /                 /
+                 *          R(cur)     B2                B2
                  */
                 left_rotate(cur->parent->parent);
                 std::swap(cur->parent->col, sibling(cur)->col);
@@ -516,19 +518,160 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         // Notice: it only happens when current node is root.
         if (cur->col == RED)
             return;
-        // If the current node is root
-        if (cur == rt) {
-            if (cur->left && cur->right && cur->left->col == cur->right->col) {
-                cur->col = RED;
-                cur->left->col = cur->right->col = BLACK;
-                return;
-            } else {
-
-            }
-        }
-        // Notice: if the current node is a black node but not root, it must have a sibling
+        /**
+         * if del < cur->key, comp = 0 - 1 = -1
+         * if del = cur->key, comp = 0 - 0 = 0
+         * if del > cur->key, comp = 1 - 0 = 1
+         */
+        int comp = Compare()(cur->data.first, del) - Compare()(del, cur->data.first);
         if (has_black_descendants(cur)) {
-            // tnode *sib = 
+            // note that sib == nullptr suggest it has no siblings or it's the root
+            tnode *sib = sibling(cur);
+            // If the (black) sibling node has two black descendants or it doesn't have a sibling
+            /** Case 1-1: cur (black, black, black), sib null or (black, black, black)
+             *  That would not change the structure of the tree
+             */
+            if (sib == nullptr || has_black_descendants(sib)) {
+                if (cur->parent)
+                    cur->parent->col = BLACK;
+                if (sib)
+                    sib->col = RED;
+                cur->col = RED;
+                return;
+            }
+            // If the current node has a sibling which has red descendent
+            /** Case 1-2: cur (black, black, black) at left, sib with outer red at right
+             *      R(par)                    B(sib)                 R(sib)
+             *     /   \                     /  \                   /   \
+             *    B(cur)B(sib) -------->  R(par) R2 -------->     B(par) B2
+             *           \               /                       /
+             *            R2            B(cur)                R(cur)
+             *  That is a left_rotate on par and change color then
+             */
+            if (is_left(cur) && sib->right && sib->right->col == RED) {
+                left_rotate(cur->parent);
+                sib->col = RED;
+                cur->parent->col = BLACK;
+                sib->right->col = BLACK;
+                cur->col = RED;
+                return;
+            }
+            /** Case 1-3: cur (black, black, black) at right, sib with outer red at left
+             *     R(par)                   B(sib)                 R(sib)
+             *    /    \                   /  \                   /  \
+             *   B(sib) B(cur) -------->  R1   R(par)  ------->  B1  B(par)
+             *  /                                \                     \
+             * R1                                 B(cur)                R(cur)
+             *  That is a right_rotate on par and change color then
+             */
+            if (!is_left(cur) && sib->left && sib->left->col == RED) {
+                right_rotate(cur->parent);
+                sib->col = RED;
+                sib->left->col = BLACK;
+                cur->parent->col = BLACK;
+                cur->col = RED;
+            }
+            /** Case 1-4: cur (black, black, black) at left, sib with inner red at left
+             *      R(par)                    R(par)                  R1                   R1
+             *     /    \                     /  \                   /  \                 /  \
+             *    B(cur) B(sib) -------->  B(cur) R1 -------->    R(par) B(sib) -----> B(par) B(sib)
+             *          /                          \             /                    /
+             *         R1                          B(sib)       B(cur)              R(cur)
+             *  That is a right_rotate on sib, left_rotate on par and change color then
+             */
+            if (is_left(cur) && sib->left && sib->left->col == RED) {
+                right_rotate(sib);
+                left_rotate(cur->parent);
+                std::swap(cur->col, cur->parent->col);
+            }
+            /** Case 1-5: cur (black, black, black) at right, sib with inner red at right
+             *      R(par)                      R(par)                 R1                   B1
+             *     /    \                      /  \                   /  \                 /  \
+             *    B(sib) B(cur) -------->    R1   B(cur) --------> B(sib) R(par) -----> B(sib) B(sib)
+             *     \                        /                               \                   \
+             *      R1                    B(sib)                           B(cur)                R(cur)
+             *  That is a left_rotate on sib, right_rotate on par and change color then
+             */
+            if (!is_left(cur) && sib->right && sib->right->col == RED) {
+                left_rotate(sib);
+                right_rotate(cur->parent);
+                std::swap(cur->col, cur->parent->col);
+            }
+        } else {
+            // If the current node is the node to be deleted
+            if (!comp) {
+                // If the current node has two descendents
+                if (cur->left && cur->right) {
+                    // If the right descendent is black
+                    /** Case 2-1: cur (black, red, black), which implies that left node has two black descendents
+                     *     B(cur)      R1         B1
+                     *    /     ----->  \  ----->  \
+                     *   R1              B(cur)    R(cur)
+                     */
+                    if (cur->right->col == BLACK) {
+                        right_rotate(cur);
+                        std::swap(cur->col, cur->parent->col);
+                    }
+                    /** Case 2-2: cur (black, black, red), we'll reach its right node then, so don't need to change anything
+                     */
+                    else
+                        ;
+                    return;
+                }
+                /** Case 2-2: cur (black, red, null)
+                 *    B(cur)     R1           B1
+                 *   /    ----->  \   ------>  \
+                 *  R1             B(cur)      R(cur)
+                 */
+                if (cur->left) {
+                    right_rotate(cur);
+                    std::swap(cur->col, cur->parent->col);
+                }
+                /** Case 2-3: cur (black, null, red)
+                 *   B(cur)        R1          B1
+                 *    \    -----> /    -----> /
+                 *    R1         B(cur)      R(cur)
+                 */
+                if (cur->right) {
+                    left_rotate(cur);
+                    std::swap(cur->col, cur->parent->col);
+                    return;
+                }
+            }
+            // If the current node isn't the node to be deleted
+            else {
+                /** Case 2-3: we'll reach a red node or nullptr then, so don't need to change anything
+                 */
+                if ((comp < 0 && (!cur->left || cur->left->col == RED)) ||
+                    (comp > 0 && (!cur->right || cur->right->col == RED)))
+                    return;
+                /** Case 2-4: cur (black, black, red) and we'll reach its left node then
+                 *      B(cur)          R2              B2
+                 *     / \              /              /
+                 *    B1 R2    -----> B(cur) ----->   R(cur)
+                 *                   /               /
+                 *                  B1              B1
+                 * That is a left_rotate on cur and change color then
+                 */
+                if (comp < 0 && cur->left->col == BLACK) {
+                    left_rotate(cur);
+                    std::swap(cur->col, cur->parent->col);
+                    return;
+                }
+                /** Case 2-5: cur (black, black, red) and we'll reach its left node then
+                 *      B(cur)       R1              B1
+                 *     / \            \               \
+                 *    R1 B2    ----->  B(cur) ----->   R(cur)
+                 *                      \               \
+                 *                      B2               B2
+                 * That is a left_rotate on cur and change color then
+                 */
+                if (comp > 0 && cur->right->col == BLACK) {
+                    right_rotate(cur);
+                    std::swap(cur->col, cur->parent->col);
+                    return;
+                }
+            }
         }
     }
 
@@ -684,7 +827,11 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      * @param cur
      * @return tnode*
      */
-    tnode *sibling(tnode *cur) { return is_left(cur) ? cur->parent->right : cur->parent->left; }
+    tnode *sibling(tnode *cur) {
+        if (cur == rt)
+            return nullptr;
+        return is_left(cur) ? cur->parent->right : cur->parent->left;
+    }
 
     /**
      * @brief Get the grand parent of the selected node
