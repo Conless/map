@@ -52,6 +52,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      */
     class const_iterator;
     class iterator {
+        friend class map;
         friend class const_iterator;
 
       private:
@@ -92,6 +93,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
          */
         iterator operator++(int) {
             iterator cp = *this;
+            if (ptr == nullptr)
+                throw invalid_iterator();
             if (ptr->right) {
                 ptr = ptr->right;
                 while (ptr->left != nullptr)
@@ -107,6 +110,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
          * TODO ++iter
          */
         iterator &operator++() {
+            if (ptr == nullptr)
+                throw invalid_iterator();
             if (ptr->right) {
                 ptr = ptr->right;
                 while (ptr->left != nullptr)
@@ -125,6 +130,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             iterator cp = *this;
             if (ptr == nullptr) {
                 ptr = iter->rt;
+                if (ptr == nullptr)
+                    throw invalid_iterator();
                 while (ptr->right != nullptr)
                     ptr = ptr->right;
                 return cp;
@@ -136,6 +143,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             } else {
                 while (ptr != iter->rt && iter->is_left(ptr))
                     ptr = ptr->parent;
+                if (ptr->parent == nullptr)
+                    throw invalid_iterator();
                 ptr = ptr->parent;
             }
             return cp;
@@ -146,6 +155,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         iterator &operator--() {
             if (ptr == nullptr) {
                 ptr = iter->rt;
+                if (ptr == nullptr)
+                    throw invalid_iterator();
                 while (ptr->right != nullptr)
                     ptr = ptr->right;
                 return *this;
@@ -158,6 +169,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
                 while (ptr != iter->rt && iter->is_left(ptr))
                     ptr = ptr->parent;
                 ptr = ptr->parent;
+                if (ptr == nullptr)
+                    throw invalid_iterator();
             }
             return *this;
         }
@@ -165,13 +178,13 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
          * a operator to check whether two iterators are same (pointing to the same memory).
          */
         value_type &operator*() const { return ptr->data; }
-        bool operator==(const iterator &rhs) const { return ptr == rhs.ptr; }
-        bool operator==(const const_iterator &rhs) const { return ptr != rhs.ptr; }
+        bool operator==(const iterator &rhs) const { return iter == rhs.iter && ptr == rhs.ptr; }
+        bool operator==(const const_iterator &rhs) const { return iter == rhs.iter && ptr != rhs.ptr; }
         /**
          * some other operator for iterator.
          */
-        bool operator!=(const iterator &rhs) const { return ptr != rhs.ptr; }
-        bool operator!=(const const_iterator &rhs) const { return ptr != rhs.ptr; }
+        bool operator!=(const iterator &rhs) const { return iter != rhs.iter || ptr != rhs.ptr; }
+        bool operator!=(const const_iterator &rhs) const { return iter != rhs.iter || ptr != rhs.ptr; }
 
         /**
          * for the support of it->first.
@@ -197,6 +210,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
 
         const_iterator operator++(int) {
             const_iterator cp = *this;
+            if (ptr == nullptr)
+                throw invalid_iterator();
             if (ptr->right) {
                 ptr = ptr->right;
                 while (ptr->left != nullptr)
@@ -209,6 +224,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             return cp;
         }
         const_iterator &operator++() {
+            if (ptr == nullptr)
+                throw invalid_iterator();
             if (ptr->right) {
                 ptr = ptr->right;
                 while (ptr->left != nullptr)
@@ -224,6 +241,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
             const_iterator cp = *this;
             if (ptr == nullptr) {
                 ptr = iter->rt;
+                if (ptr == nullptr)
+                    throw invalid_iterator();
                 while (ptr->right != nullptr)
                     ptr = ptr->right;
                 return cp;
@@ -236,12 +255,16 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
                 while (ptr != iter->rt && iter->is_left(ptr))
                     ptr = ptr->parent;
                 ptr = ptr->parent;
+                if (ptr == nullptr)
+                    throw invalid_iterator();
             }
             return cp;
         }
         const_iterator &operator--() {
             if (ptr == nullptr) {
                 ptr = iter->rt;
+                if (ptr == nullptr)
+                    throw invalid_iterator();
                 while (ptr->right != nullptr)
                     ptr = ptr->right;
                 return *this;
@@ -254,6 +277,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
                 while (ptr != iter->rt && iter->is_left(ptr))
                     ptr = ptr->parent;
                 ptr = ptr->parent;
+                if (ptr == nullptr)
+                    throw invalid_iterator();
             }
             return *this;
         }
@@ -261,9 +286,9 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
         const value_type &operator*() const { return ptr->data; }
 
         // And other methods in iterator.
-        bool operator==(const const_iterator &rhs) { return ptr == rhs.ptr; }
+        bool operator==(const const_iterator &rhs) { return iter == rhs.iter && ptr == rhs.ptr; }
         // And other methods in iterator.
-        bool operator!=(const const_iterator &rhs) { return ptr != rhs.ptr; }
+        bool operator!=(const const_iterator &rhs) { return iter != rhs.iter || ptr != rhs.ptr; }
         // And other methods in iterator.
         const value_type *operator->() const noexcept { return &ptr->data; }
     };
@@ -439,9 +464,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map {
      * throw if pos pointed to a bad element (pos == this->end() || pos points an element out of this)
      */
     void erase(iterator pos) {
-        iterator target = find(pos->first);
-        if (target == end() || target != pos)
-            return;
+        if (pos.iter != this || pos == end())
+            throw invalid_iterator();
         if (!Compare()(rt->data.first, pos->first) && !Compare()(rt->data.first, pos->first) && rt->left == nullptr &&
             rt->right == nullptr) {
             delete rt;
