@@ -36,125 +36,42 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
             : data(_data), left(nullptr), right(nullptr), parent(_parent), col(_col), siz(_siz) {}
     } * rt;
 
-    int siz = 0;
-
   public:
     RBTree() { rt = nullptr; }
     RBTree(const RBTree<Key, T, Compare> &other) {
         rt = node_copy(other.rt);
-        siz = other.siz;
     }
 
     RBTree &operator=(const RBTree &other) {
         if (this == &other)
             return *this;
-        RBTree<Key, T, Compare>::rt = RBTree<Key, T, Compare>::node_copy(other.rt);
-        RBTree<Key, T, Compare>::siz = other.siz;
+        rt = node_copy(other.rt);
         return *this;
     }
 
     ~RBTree() { node_destruct(rt); }
 
   public:
-    pair<tnode *, bool> insert(const value_type &value) {
-        tnode *cur = rt, *next;
-        if (cur == nullptr) { // If the tree is empty
-            // Create a new root node, with col = RED, size = 1 and no links to other node
-            rt = cur = new tnode(value, nullptr, BLACK);
-            siz++;
-            return {cur, true};
-        }
-        // Here we try to ensure the node we found cannot have a red sibling,
-        // which requires that every node on the path doesn't have two red descendants.
-        while (true) {
-            int comp = Compare()(cur->data.first, value.first) - Compare()(value.first, cur->data.first);
-            if (!comp) // Find the same element
-                return {cur, false};
-            // If the current node has two red descendeants, we should change them to black.
-            if ((cur->left && cur->left->col == RED) && (cur->right && cur->right->col == RED)) {
-                cur->col = RED;
-                cur->left->col = cur->right->col = BLACK;
-                // fix the situation if there's a red-red link to its parent.
-                insert_adjust(cur);
-            }
-            if (comp < 0) {
-                if (cur->left == nullptr) {
-                    cur = cur->left = new tnode(value, cur, RED);
-                    break;
-                }
-                cur = cur->left;
-            } else {
-                if (cur->right == nullptr) {
-                    cur = cur->right = new tnode(value, cur, RED);
-                    break;
-                }
-                cur = cur->right;
-            }
-        }
-        // After inserted, fix the red-red link again
-        insert_adjust(cur);
-        // Change the size backward
-        // size_adjust_upward(cur, 1);
-        siz++;
-        return {cur, true};
-    }
-
-    void erase(const Key &key) {
-        if (!Compare()(rt->data.first, key) && !Compare()(rt->data.first, key) && rt->left == nullptr && rt->right == nullptr) {
-            delete rt;
-            rt = nullptr;
-            siz--;
-            return;
-        }
-        tnode *cur = rt;
-        // Here we try to ensure every node we met is red, which then conducts the node we want to delete is red
-        while (true) {
-            if (cur == nullptr)
-                return;
-            // Change the current node to red
-            erase_adjust(cur, key);
-            int comp = Compare()(cur->data.first, key) - Compare()(key, cur->data.first);
-            // If we find the node with two descendents,
-            // swap the data with its 'next' node and delete that node then
-            if (!comp && cur->left != nullptr && cur->right != nullptr) {
-                tnode *next = cur->right;
-                while (next->left)
-                    next = next->left;
-                node_swap(cur, next);
-                cur = next->right;
-                continue;
-            }
-            // If we find the node
-            if (!comp) {
-                tnode *replacement = cur->left == nullptr ? cur->right : cur->left;
-                if (is_left(cur))
-                    cur->parent->left = replacement;
-                else
-                    cur->parent->right = replacement;
-                // size_adjust_upward(cur, -1);
-                delete cur;
-                siz--;
-                return;
-            }
-            // Go to the next node
-            cur = comp > 0 ? cur->right : cur->left;
-        }
-    }
+    /**
+     * @brief checks whether the container is empty
+     * 
+     * @return true if empty
+     * @return false otherwise
+     */
+    bool empty() { return rt == nullptr; }
+    /**
+     * @brief returns the number of elements.
+     * 
+     * @return size_t 
+     */
+    size_t size() const { return rt ? rt->siz : 0; }
+    /**
+     * @brief clear the contents
+     * 
+     */
+    void clear() { node_destruct(rt); }
 
   public:
-    /**
-     * @brief custom exceptions for the protected and private functions of map
-     *
-     */
-    class custom_exception {
-      public:
-        custom_exception(const std::string &_msg) : msg(_msg) {}
-        std::string what() { return msg; }
-
-      private:
-        std::string msg;
-    };
-
     tnode *find(const Key &key) const {
         tnode *cur = rt;
         while (cur != nullptr) {
@@ -223,9 +140,104 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
         return ptr;
     }
 
-  protected:
+  public:
+    pair<tnode *, bool> insert(const value_type &value) {
+        tnode *cur = rt, *next;
+        if (cur == nullptr) { // If the tree is empty
+            // Create a new root node, with col = RED, size = 1 and no links to other node
+            rt = cur = new tnode(value, nullptr, BLACK, 1);
+            return {cur, true};
+        }
+        // Here we try to ensure the node we found cannot have a red sibling,
+        // which requires that every node on the path doesn't have two red descendants.
+        while (true) {
+            int comp = Compare()(cur->data.first, value.first) - Compare()(value.first, cur->data.first);
+            if (!comp) // Find the same element
+                return {cur, false};
+            // If the current node has two red descendeants, we should change them to black.
+            if ((cur->left && cur->left->col == RED) && (cur->right && cur->right->col == RED)) {
+                cur->col = RED;
+                cur->left->col = cur->right->col = BLACK;
+                // fix the situation if there's a red-red link to its parent.
+                insert_adjust(cur);
+            }
+            if (comp < 0) {
+                if (cur->left == nullptr) {
+                    cur = cur->left = new tnode(value, cur, RED);
+                    break;
+                }
+                cur = cur->left;
+            } else {
+                if (cur->right == nullptr) {
+                    cur = cur->right = new tnode(value, cur, RED);
+                    break;
+                }
+                cur = cur->right;
+            }
+        }
+        // Change the size backward
+        size_adjust_upward(cur, 1);
+        // After inserted, fix the red-red link again
+        insert_adjust(cur);
+        return {cur, true};
+    }
+
+    void erase(const Key &key) {
+        if (!Compare()(rt->data.first, key) && !Compare()(rt->data.first, key) && rt->left == nullptr && rt->right == nullptr) {
+            delete rt;
+            rt = nullptr;
+            return;
+        }
+        tnode *cur = rt;
+        // Here we try to ensure every node we met is red, which then conducts the node we want to delete is red
+        while (true) {
+            if (cur == nullptr)
+                return;
+            // Change the current node to red
+            erase_adjust(cur, key);
+            int comp = Compare()(cur->data.first, key) - Compare()(key, cur->data.first);
+            // If we find the node with two descendents,
+            // swap the data with its 'next' node and delete that node then
+            if (!comp && cur->left != nullptr && cur->right != nullptr) {
+                tnode *next = cur->right;
+                while (next->left)
+                    next = next->left;
+                node_swap(cur, next);
+                cur = next->right;
+                continue;
+            }
+            // If we find the node
+            if (!comp) {
+                tnode *replacement = cur->left == nullptr ? cur->right : cur->left;
+                if (is_left(cur))
+                    cur->parent->left = replacement;
+                else
+                    cur->parent->right = replacement;
+                size_adjust_upward(cur, -1);
+                delete cur;
+                return;
+            }
+            // Go to the next node
+            cur = comp > 0 ? cur->right : cur->left;
+        }
+    }
+
+  private:
+    /**
+     * @brief custom exceptions for the protected and private functions of map
+     *
+     */
+    class custom_exception {
+      public:
+        custom_exception(const std::string &_msg) : msg(_msg) {}
+        std::string what() { return msg; }
+
+      private:
+        std::string msg;
+    };
+
     void size_adjust(tnode *cur) {
-        cur->siz = 0;
+        cur->siz = 1;
         if (cur->left != nullptr)
             cur->siz += cur->left->siz;
         if (cur->right != nullptr)
@@ -501,8 +513,8 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
             tmp->left->parent = cur;
         tmp->left = cur;
         cur->parent = tmp;
-        // size_adjust(cur);
-        // size_adjust(tmp);
+        size_adjust(cur);
+        size_adjust(tmp);
     }
 
     /**
@@ -534,11 +546,11 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
             tmp->right->parent = cur;
         tmp->right = cur;
         cur->parent = tmp;
-        // size_adjust(cur);
-        // size_adjust(tmp);
+        size_adjust(cur);
+        size_adjust(tmp);
     }
 
-  protected:
+  private:
     /**
      * @brief copy a tree node
      *
@@ -668,7 +680,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
          * TODO add data members
          *   just add whatever you want.
          */
-        const RBTree<Key, T, Compare> *iter;
+        const map *iter;
         tnode *ptr;
 
       public:
@@ -695,7 +707,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
 
         iterator() : iter(nullptr), ptr(nullptr) {}
         iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
-        iterator(const RBTree<Key, T, Compare> *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
+        iterator(const map *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
         /**
          * TODO iter++
          */
@@ -765,14 +777,14 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         //  and it should be able to construct from an iterator.
       private:
         // data members.
-        const RBTree<Key, T, Compare> *iter;
+        const map *iter;
         tnode *ptr;
 
       public:
         const_iterator() : iter(nullptr), ptr(nullptr) {}
         const_iterator(const const_iterator &other) : iter(other.iter), ptr(other.ptr) {}
         const_iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
-        const_iterator(const RBTree<Key, T, Compare> *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
+        const_iterator(const map *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
 
         const_iterator operator++(int) {
             if (ptr == nullptr)
@@ -872,22 +884,6 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
      */
     iterator end() { return iterator{this, nullptr}; }
     const_iterator cend() const { return const_iterator(this, nullptr); }
-    /**
-     * checks whether the container is empty
-     * return true if empty, otherwise false.
-     */
-    bool empty() const { return RBTree<Key, T, Compare>::rt == nullptr; }
-    /**
-     * returns the number of elements.
-     */
-    size_t size() const { return RBTree<Key, T, Compare>::siz; }
-    /**
-     * clears the contents
-     */
-    void clear() {
-        RBTree<Key, T, Compare>::node_destruct(RBTree<Key, T, Compare>::rt);
-        RBTree<Key, T, Compare>::siz = 0;
-    }
 
   public:
     /**
