@@ -12,11 +12,6 @@
 
 namespace sjtu {
 
-template <typename T> struct my_type_traits { using iterator_assignable = typename T::iterator_assignable; };
-
-struct my_true_type {};
-struct my_false_type {};
-
 template <class Key, class T, class Compare = std::less<Key>> class RBTree {
   public:
     /**
@@ -661,8 +656,22 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
     }
 };
 
-template <class Key, class T, class Compare = std::less<Key>> class map : public sjtu::RBTree<Key, T, Compare> {
+template <typename T> struct my_type_traits {
+    using iterator_assignable = typename T::iterator_assignable;
+};
+
+struct my_true_type {
+    static constexpr bool value = true;
+};
+struct my_false_type {
+    static constexpr bool value = false;
+};
+
+template <class Key, class T, class Compare = std::less<Key>> class map : public RBTree<Key, T, Compare> {
   public:
+    using tnode = typename RBTree<Key, T, Compare>::tnode;
+    using value_type = typename RBTree<Key, T, Compare>::value_type;
+
     /**
      * see BidirectionalIterator at CppReference for help.
      *
@@ -670,9 +679,6 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
      *     like it = map.begin(); --it;
      *       or it = map.end(); ++end();
      */
-    using tnode = typename RBTree<Key, T, Compare>::tnode;
-    using value_type = typename RBTree<Key, T, Compare>::value_type;
-
     class const_iterator;
     class iterator {
         friend class map;
@@ -703,11 +709,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         using reference = value_type &;
         using iterator_category = std::output_iterator_tag;
 
-        // If you are interested in type_traits, toy_traits_test provides a place to
-        // practice. But the method used in that test is old and rarely used, so you
-        // may explore on your own.
-        // Notice: you may add some code in here and class const_iterator and namespace sjtu to implement toy_traits_test,
-        // this part is only for bonus.
+        // Types for the type traits test
         using iterator_assignable = my_true_type;
 
         iterator() : iter(nullptr), ptr(nullptr) {}
@@ -787,7 +789,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
 
       public:
         using iterator_assignable = my_false_type;
-        
+
         const_iterator() : iter(nullptr), ptr(nullptr) {}
         const_iterator(const const_iterator &other) : iter(other.iter), ptr(other.ptr) {}
         const_iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
