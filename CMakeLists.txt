@@ -17,7 +17,7 @@ add_subdirectory(src)
 # Testing
 enable_testing()
 set(files_prefix "${CMAKE_CURRENT_SOURCE_DIR}/data")
-file(GLOB_RECURSE CPPs "${files_prefix}/one/**.cpp" "${files_prefix}/two/**.cpp" "${files_prefix}/three/**.cpp" "${files_prefix}/four/**.cpp" "${files_prefix}/five/**.cpp")
+file(GLOB_RECURSE CPPs "${files_prefix}/one/**.cpp" "${files_prefix}/two/**.cpp" "${files_prefix}/three/**.cpp" "${files_prefix}/four/**.cpp" "${files_prefix}/five/**.cpp" "${files_prefix}/toy_traits_test/**.cpp")
 
 string(REGEX REPLACE "^/([a-zA-Z]*/)*" "" cata "${CMAKE_CURRENT_SOURCE_DIR}")
 

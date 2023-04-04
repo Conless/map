@@ -12,6 +12,11 @@
 
 namespace sjtu {
 
+template <typename T> struct my_type_traits { using iterator_assignable = typename T::iterator_assignable; };
+
+struct my_true_type {};
+struct my_false_type {};
+
 template <class Key, class T, class Compare = std::less<Key>> class RBTree {
   public:
     /**
@@ -38,9 +43,7 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
 
   public:
     RBTree() { rt = nullptr; }
-    RBTree(const RBTree<Key, T, Compare> &other) {
-        rt = node_copy(other.rt);
-    }
+    RBTree(const RBTree<Key, T, Compare> &other) { rt = node_copy(other.rt); }
 
     RBTree &operator=(const RBTree &other) {
         if (this == &other)
@@ -54,20 +57,20 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
   public:
     /**
      * @brief checks whether the container is empty
-     * 
+     *
      * @return true if empty
      * @return false otherwise
      */
     bool empty() { return rt == nullptr; }
     /**
      * @brief returns the number of elements.
-     * 
-     * @return size_t 
+     *
+     * @return size_t
      */
     size_t size() const { return rt ? rt->siz : 0; }
     /**
      * @brief clear the contents
-     * 
+     *
      */
     void clear() { node_destruct(rt); }
 
@@ -699,11 +702,13 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         using pointer = value_type *;
         using reference = value_type &;
         using iterator_category = std::output_iterator_tag;
+
         // If you are interested in type_traits, toy_traits_test provides a place to
         // practice. But the method used in that test is old and rarely used, so you
         // may explore on your own.
         // Notice: you may add some code in here and class const_iterator and namespace sjtu to implement toy_traits_test,
         // this part is only for bonus.
+        using iterator_assignable = my_true_type;
 
         iterator() : iter(nullptr), ptr(nullptr) {}
         iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
@@ -781,6 +786,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         tnode *ptr;
 
       public:
+        using iterator_assignable = my_false_type;
+        
         const_iterator() : iter(nullptr), ptr(nullptr) {}
         const_iterator(const const_iterator &other) : iter(other.iter), ptr(other.ptr) {}
         const_iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
