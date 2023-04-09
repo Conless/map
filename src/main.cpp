@@ -34,8 +34,6 @@ template <class T> void test_by_type(T iter, sjtu::my_false_type) {
     std::cout << "The iterator pointing to (" << iter->first << ", " << iter->second << ")" << " is judged not assignable by false_type." << std::endl;
 }
 
-void assignable();
-
 template <class T> void type_traits_test(T iter) {
     using iterator_assignable = typename sjtu::my_type_traits<T>::iterator_assignable;
     test_by_bool(iter, iterator_assignable::value);

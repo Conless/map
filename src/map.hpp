@@ -656,15 +656,14 @@ template <class Key, class T, class Compare = std::less<Key>> class RBTree {
     }
 };
 
-template <typename T> struct my_type_traits {
-    using iterator_assignable = typename T::iterator_assignable;
-};
-
 struct my_true_type {
     static constexpr bool value = true;
 };
 struct my_false_type {
     static constexpr bool value = false;
+};
+template <typename T> struct my_type_traits {
+	using iterator_assignable = typename T::iterator_assignable;
 };
 
 template <class Key, class T, class Compare = std::less<Key>> class map : public RBTree<Key, T, Compare> {
@@ -679,19 +678,17 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
      *     like it = map.begin(); --it;
      *       or it = map.end(); ++end();
      */
-    class const_iterator;
-    class iterator {
+    template <bool const_tag> class base_iterator {
         friend class map;
-        friend class const_iterator;
-
-      private:
+        friend class base_iterator<true>;
+        friend class base_iterator<false>;
+      protected:
         /**
          * TODO add data members
          *   just add whatever you want.
          */
         const map *iter;
         tnode *ptr;
-
       public:
         // The following code is written for the C++ type_traits library.
         // Type traits is a C++ feature for describing certain properties of a type.
@@ -705,30 +702,28 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         // About iterator_category: https://en.cppreference.com/w/cpp/iterator
         using difference_type = std::ptrdiff_t;
         using value_type = typename RBTree<Key, T, Compare>::value_type;
-        using pointer = value_type *;
-        using reference = value_type &;
         using iterator_category = std::output_iterator_tag;
-
-        // Types for the type traits test
-        using iterator_assignable = my_true_type;
-
-        iterator() : iter(nullptr), ptr(nullptr) {}
-        iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
-        iterator(const map *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
+        using pointer = typename std::conditional<const_tag, const value_type *, value_type *>::type;
+        using reference = typename std::conditional<const_tag, const value_type &, value_type &>::type;
+        using iterator_assignable = typename std::conditional<const_tag, my_false_type, my_true_type>::type;
+        
+        base_iterator() : iter(nullptr), ptr(nullptr) {}
+        template <bool _const_tag> base_iterator(const base_iterator<_const_tag> &other) : iter(other.iter), ptr(other.ptr) {}
+        base_iterator(const map *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
         /**
          * TODO iter++
          */
-        iterator operator++(int) {
+        base_iterator operator++(int) {
             if (ptr == nullptr)
                 throw invalid_iterator();
-            iterator cp = *this;
+            base_iterator cp = *this;
             ptr = iter->next(ptr);
             return cp;
         }
         /**
          * TODO ++iter
          */
-        iterator &operator++() {
+        base_iterator &operator++() {
             if (ptr == nullptr)
                 throw invalid_iterator();
             ptr = iter->next(ptr);
@@ -737,8 +732,8 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         /**
          * TODO iter--
          */
-        iterator operator--(int) {
-            iterator cp = *this;
+        base_iterator operator--(int) {
+            base_iterator cp = *this;
             if (ptr == nullptr)
                 ptr = iter->last();
             else
@@ -750,7 +745,7 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         /**
          * TODO --iter
          */
-        iterator &operator--() {
+        base_iterator &operator--() {
             if (ptr == nullptr)
                 ptr = iter->last();
             else
@@ -762,81 +757,18 @@ template <class Key, class T, class Compare = std::less<Key>> class map : public
         /**
          * a operator to check whether two iterators are same (pointing to the same memory).
          */
-        value_type &operator*() const { return ptr->data; }
-        bool operator==(const iterator &rhs) const { return iter == rhs.iter && ptr == rhs.ptr; }
-        bool operator==(const const_iterator &rhs) const { return iter == rhs.iter && ptr != rhs.ptr; }
+        template <bool _const_tag> bool operator==(const base_iterator<_const_tag> &rhs) const { return iter == rhs.iter && ptr == rhs.ptr; }
+        template <bool _const_tag> bool operator!=(const base_iterator<_const_tag> &rhs) const { return iter != rhs.iter || ptr != rhs.ptr; }
         /**
          * some other operator for iterator.
-         */
-        bool operator!=(const iterator &rhs) const { return iter != rhs.iter || ptr != rhs.ptr; }
-        bool operator!=(const const_iterator &rhs) const { return iter != rhs.iter || ptr != rhs.ptr; }
-
-        /**
-         * for the support of it->first.
-         * See <http://kelvinh.github.io/blog/2013/11/20/overloading-of-member-access-operator-dash-greater-than-symbol-in-cpp/>
-         * for help.
-         */
-        value_type *operator->() const noexcept { return &ptr->data; }
+         */        
+		reference operator*() const { return this->ptr->data; }
+		pointer operator->() const { return &this->ptr->data; }
     };
-    class const_iterator {
-        friend class iterator;
-        // it should has similar member method as iterator.
-        //  and it should be able to construct from an iterator.
-      private:
-        // data members.
-        const map *iter;
-        tnode *ptr;
 
-      public:
-        using iterator_assignable = my_false_type;
+    using iterator = base_iterator<false>;
+    using const_iterator = base_iterator<true>;
 
-        const_iterator() : iter(nullptr), ptr(nullptr) {}
-        const_iterator(const const_iterator &other) : iter(other.iter), ptr(other.ptr) {}
-        const_iterator(const iterator &other) : iter(other.iter), ptr(other.ptr) {}
-        const_iterator(const map *_iter, tnode *_ptr) : iter(_iter), ptr(_ptr) {}
-
-        const_iterator operator++(int) {
-            if (ptr == nullptr)
-                throw invalid_iterator();
-            const_iterator cp = *this;
-            ptr = iter->next(ptr);
-            return cp;
-        }
-        const_iterator &operator++() {
-            if (ptr == nullptr)
-                throw invalid_iterator();
-            ptr = iter->next(ptr);
-            return *this;
-        }
-        const_iterator operator--(int) {
-            const_iterator cp = *this;
-            if (ptr == nullptr)
-                ptr = iter->last();
-            else
-                ptr = iter->prev(ptr);
-            if (ptr == nullptr)
-                throw invalid_iterator();
-            return cp;
-        }
-        const_iterator &operator--() {
-            if (ptr == nullptr)
-                ptr = iter->last();
-            else
-                ptr = iter->prev(ptr);
-            if (ptr == nullptr)
-                throw invalid_iterator();
-            return *this;
-        }
-
-        const value_type &operator*() const { return ptr->data; }
-
-        // And other methods in iterator.
-        bool operator==(const const_iterator &rhs) { return iter == rhs.iter && ptr == rhs.ptr; }
-        // And other methods in iterator.
-        bool operator!=(const const_iterator &rhs) { return iter != rhs.iter || ptr != rhs.ptr; }
-        // And other methods in iterator.
-        const value_type *operator->() const noexcept { return &ptr->data; }
-    };
     /**
      * TODO two constructors
      */
